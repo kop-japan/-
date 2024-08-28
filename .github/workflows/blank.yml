@@ -1,0 +1,53 @@
+name: Run Colab Script with Google Drive
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 毎日0時に実行
+
+jobs:
+  run-colab:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        pip install --upgrade google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+
+    - name: Run Colab Notebook with Google Drive access
+      env:
+        GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+        GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+        GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      run: |
+        python -c "
+import os
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+
+creds = Credentials(
+    token=None,
+    refresh_token=os.environ['GDRIVE_REFRESH_TOKEN'],
+    token_uri='https://oauth2.googleapis.com/token',
+    client_id=os.environ['GDRIVE_CLIENT_ID'],
+    client_secret=os.environ['GDRIVE_CLIENT_SECRET']
+)
+drive_service = build('drive', 'v3', credentials=creds)
+
+# Google Drive上のファイルにアクセスする例
+results = drive_service.files().list(pageSize=10, fields='files(id, name)').execute()
+items = results.get('files', [])
+
+if not items:
+    print('No files found.')
+else:
+    print('Files:')
+    for item in items:
+        print(f'{item["name"]} ({item["id"]})')
+"
